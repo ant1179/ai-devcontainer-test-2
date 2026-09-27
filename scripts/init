@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+
+# Initializes a new project created from the devcontainer template.
+#
+# The project name is derived from the repository directory name and written
+# to the local .env configuration together with optional user-specific
+# settings such as the dotfiles repository.
+#
+# Host prerequisites are validated before any project configuration is
+# created. This script does not install or configure host dependencies.
+#
+# This script never overwrites an existing .env configuration.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+ENV_FILE="${REPO_ROOT}/.env"
+ENV_EXAMPLE_FILE="${REPO_ROOT}/.env.example"
+DOCTOR="${REPO_ROOT}/scripts/internal/doctor"
+
+# A project created from the template inherits its identity from its directory.
+PROJECT_NAME="$(basename "${REPO_ROOT}")"
+
+# ---------------------------------------------------------------------------
+# Validate template
+# ---------------------------------------------------------------------------
+
+if [[ ! -f "${ENV_EXAMPLE_FILE}" ]]; then
+  echo "Configuration template not found: ${ENV_EXAMPLE_FILE}" >&2
+  exit 1
+fi
+
+if [[ ! -x "${DOCTOR}" ]]; then
+  echo "Prerequisite checker not found or not executable: ${DOCTOR}" >&2
+  exit 1
+fi
+
+if [[ -f "${ENV_FILE}" ]]; then
+  echo "Configuration already exists: ${ENV_FILE}" >&2
+  echo "Remove it first if you want to reinitialize this project." >&2
+  exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# Validate host prerequisites
+# ---------------------------------------------------------------------------
+
+echo "Validating host prerequisites..."
+echo
+
+if ! "${DOCTOR}"; then
+  echo >&2
+  echo "Initialization aborted because host prerequisites are not satisfied." >&2
+  echo "See README.md → Installation prerequisites." >&2
+  exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# Initialize project configuration
+# ---------------------------------------------------------------------------
+
+echo
+echo "Initializing devcontainer configuration"
+echo
+echo "Project name: ${PROJECT_NAME}"
+echo
+
+read -rp "Dotfiles repository (leave empty to disable): " DOTFILES_REPOSITORY
+
+# Generate the local project configuration. The file is intentionally excluded
+# from Git because each project instance may contain user-specific settings.
+cat >"${ENV_FILE}" <<EOF
+PROJECT_NAME="${PROJECT_NAME}"
+DOTFILES_REPOSITORY="${DOTFILES_REPOSITORY}"
+EOF
+
+chmod 600 "${ENV_FILE}"
+
+# ---------------------------------------------------------------------------
+# Done
+# ---------------------------------------------------------------------------
+
+echo
+echo "Configuration created: ${ENV_FILE}"
+echo
+echo "You can now create the devcontainer with:"
+echo
+echo "  ./scripts/devcontainer up --recreate"

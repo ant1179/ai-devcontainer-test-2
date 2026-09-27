@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+
+# Recreates the DevPod workspace using the selected security mode.
+#
+# Hardened mode may use a configured dotfiles repository. Dotfiles remain
+# optional: when no repository is configured, the workspace starts normally
+# without them.
+#
+# Bunkered mode deliberately starts without dotfiles to minimize the
+# environment's access to user-specific configuration.
+
+set -euo pipefail
+
+SECURITY_MODE="${1:?Security mode required: hardened or bunkered}"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
+CONFIG_FILE="${REPO_ROOT}/.env"
+
+if [[ ! -f "${CONFIG_FILE}" ]]; then
+  echo "Configuration file not found: ${CONFIG_FILE}" >&2
+  exit 1
+fi
+
+# Load project configuration.
+# shellcheck disable=SC1090
+source "${CONFIG_FILE}"
+
+if [[ "${SECURITY_MODE}" != "hardened" && "${SECURITY_MODE}" != "bunkered" ]]; then
+  echo "Invalid security mode: ${SECURITY_MODE}" >&2
+  exit 1
+fi
+
+echo
+echo "Starting DevPod (${SECURITY_MODE})..."
+echo
+
+# Dotfiles are available only in hardened mode and remain optional.
+#
+# Hardened:
+#   configured repository -> inject dotfiles
+#   no repository         -> start normally without dotfiles
+#
+# Bunkered:
+#   always start without dotfiles
+if [[ "${SECURITY_MODE}" == "hardened" && -n "${DOTFILES_REPOSITORY:-}" ]]; then
+  echo "Dotfiles: enabled"
+
+  devpod up "${REPO_ROOT}" \
+    --recreate \
+    --context "${SECURITY_MODE}" \
+    --ide none \
+    --dotfiles "${DOTFILES_REPOSITORY}"
+else
+  if [[ "${SECURITY_MODE}" == "hardened" ]]; then
+    echo "Dotfiles: disabled (not configured)"
+  else
+    echo "Dotfiles: disabled (bunkered mode)"
+  fi
+
+  devpod up "${REPO_ROOT}" \
+    --recreate \
+    --context "${SECURITY_MODE}" \
+    --ide none
+fi

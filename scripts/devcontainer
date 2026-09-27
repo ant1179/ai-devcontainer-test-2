@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+
+# User-facing entry point for the devcontainer lifecycle.
+#
+# This command intentionally separates two workflows:
+#   - regular operations (up, ssh, delete) preserve the existing environment;
+#   - up --recreate performs a full configuration and recreation.
+#
+# Implementation details are delegated to scripts/internal/.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INTERNAL_DIR="${SCRIPT_DIR}/internal"
+
+usage() {
+  echo "Usage:"
+  echo "  $0 up [--recreate]"
+  echo "  $0 ssh"
+  echo "  $0 delete"
+}
+
+# Security mode is selected only when recreating the environment.
+# Starting or connecting to an existing devcontainer must never alter its mode.
+select_security_mode() {
+  echo "Security mode:"
+  echo
+  echo "  1) hardened  - sudo available, password required for every sudo command"
+  echo "  2) bunkered  - privilege escalation completely disabled"
+  echo
+
+  while true; do
+    printf "Select mode [1/2]: "
+    read -r choice
+
+    case "${choice}" in
+    1)
+      SECURITY_MODE="hardened"
+      break
+      ;;
+    2)
+      SECURITY_MODE="bunkered"
+      break
+      ;;
+    *)
+      echo "Invalid choice."
+      ;;
+    esac
+  done
+
+  echo
+  echo "Security mode: ${SECURITY_MODE}"
+}
+
+command="${1:-}"
+
+case "${command}" in
+up)
+  shift
+
+  if [[ "${1:-}" == "--recreate" ]]; then
+    shift
+
+    if [[ $# -ne 0 ]]; then
+      usage
+      exit 1
+    fi
+
+    # Recreate and fully configure the devcontainer.
+    select_security_mode
+    "${INTERNAL_DIR}/recreate-environment" "${SECURITY_MODE}"
+  else
+    if [[ $# -ne 0 ]]; then
+      usage
+      exit 1
+    fi
+
+    # Start the existing devcontainer without changing its configuration.
+    "${INTERNAL_DIR}/devpod-wrapper" up . --ide none
+  fi
+  ;;
+
+ssh)
+  shift
+
+  if [[ $# -ne 0 ]]; then
+    usage
+    exit 1
+  fi
+
+  # Connect to the existing devcontainer without changing its configuration.
+  "${INTERNAL_DIR}/devpod-wrapper" ssh .
+  ;;
+
+delete)
+  shift
+
+  if [[ $# -ne 0 ]]; then
+    usage
+    exit 1
+  fi
+
+  # Delete the DevPod workspace and clean up environment-specific resources.
+  "${INTERNAL_DIR}/devpod-wrapper" delete .
+  ;;
+
+*)
+  usage
+  exit 1
+  ;;
+esac

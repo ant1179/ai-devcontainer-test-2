@@ -1,0 +1,38 @@
+# Generated security overlay
+.devcontainer/docker-compose.generated.yaml
+
+# devcontainer
+*.agekey
+age*
+*.age*
+
+# temp directories
+screenshots/
+analyse.md
+
+# cursor
+.cursor/
+*cursor*
+
+# Secrets — keep committed templates (*.env.example)
+.env
+**/.env
+!.env.example
+!**/.env.example
+
+# Dependencies
+node_modules/
+
+# Tests / coverage
+coverage/
+.nyc_output/
+
+# Build artifacts
+dist/
+build/
+*.tsbuildinfo
+
+# OS
+.DS_Store
+
+.devcontainer/.env
